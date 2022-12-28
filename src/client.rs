@@ -1001,12 +1001,35 @@ impl<T: Read + Write> Session<T> {
         &mut self,
         uid_set: impl AsRef<str>,
         mailbox_name: impl AsRef<str>,
-    ) -> Result<()> {
-        self.run_command_and_check_ok(&format!(
+    ) -> Result<Option<CopyUid>> {
+        let resp = self.run_command_and_read_response(&format!(
             "UID MOVE {} {}",
             uid_set.as_ref(),
             validate_str("UID MOVE", "mailbox", mailbox_name.as_ref())?
-        ))
+        ))?;
+
+        let mut rest = resp.as_slice();
+        while let Ok((tail, resp)) = imap_proto::parser::parse_response(rest) {
+            use imap_proto::ResponseCode;
+            if let Response::Data {
+                status,
+                code: Some(ResponseCode::CopyUid(uid_validity, old_uids, new_uids)),
+                ..
+            } = resp
+            {
+                if status != imap_proto::Status::Ok {
+                    break;
+                }
+
+                return Ok(Some(CopyUid {
+                    uid_validity,
+                    old_uids,
+                    new_uids,
+                }));
+            }
+            rest = tail;
+        }
+        Ok(None)
     }
 
     /// The [`LIST` command](https://tools.ietf.org/html/rfc3501#section-6.3.8) returns a subset of

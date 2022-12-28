@@ -132,3 +132,6 @@ pub use self::unsolicited_response::{AttributeValue, UnsolicitedResponse};
 
 mod appended;
 pub use self::appended::Appended;
+
+mod copyuid;
+pub use copyuid::CopyUid;
